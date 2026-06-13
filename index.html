@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jaehee's Board</title>
+    <meta name="description" content="마크다운으로 작성하는 개인 게시판">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --text-1: #0f172a;
+            --text-2: #475569;
+            --text-3: #94a3b8;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --header-h: 64px;
+            --radius: 12px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--header-h);
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            transition: box-shadow 0.2s;
+        }
+        .header.scrolled { box-shadow: var(--shadow-md); }
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-1);
+            text-decoration: none;
+            cursor: pointer;
+            user-select: none;
+        }
+        .logo span { color: var(--primary); }
+        .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+        /* ── Container ── */
+        .container { max-width: 860px; margin: 0 auto; padding: 0 1.5rem; }
+        .main-content {
+            padding-top: calc(var(--header-h) + 2.5rem);
+            padding-bottom: 5rem;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s ease;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+        }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-2);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { background: var(--bg); color: var(--text-1); }
+        .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+        .btn-danger { background: #fee2e2; color: #dc2626; border: none; }
+        .btn-danger:hover { background: #fecaca; }
+
+        /* ── Views ── */
+        .view { display: none; animation: fade-in 0.2s ease; }
+        .view.active { display: block; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+        /* ── Board List ── */
+        .board-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--text-1);
+        }
+        .board-title { font-size: 1.5rem; font-weight: 700; }
+        .post-count { font-size: 0.875rem; color: var(--text-3); }
+
+        .post-list { list-style: none; }
+        .post-item {
+            display: flex;
+            gap: 1.25rem;
+            padding: 1.4rem 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.12s;
+            outline: none;
+        }
+        .post-item:first-child { padding-top: 0; }
+        .post-item:hover .post-title { color: var(--primary); }
+        .post-item:focus-visible { outline: 2px solid var(--primary); border-radius: 4px; }
+
+        .post-thumbnail {
+            width: 128px;
+            min-width: 128px;
+            height: 96px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #e0e7ff, #dbeafe);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 2.25rem;
+        }
+        .post-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .post-thumbnail.no-img { display: none; }
+
+        .post-body {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.4rem;
+        }
+        .post-title {
+            font-size: 1.0625rem;
+            font-weight: 700;
+            color: var(--text-1);
+            transition: color 0.15s;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+        }
+        .post-preview {
+            font-size: 0.875rem;
+            color: var(--text-2);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.55;
+            flex: 1;
+        }
+        .post-meta {
+            font-size: 0.8125rem;
+            color: var(--text-3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .post-meta svg { flex-shrink: 0; }
+
+        /* ── Skeleton ── */
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 6px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .skel-item { display: flex; gap: 1.25rem; padding: 1.4rem 0; border-bottom: 1px solid var(--border); }
+        .skel-thumb { width: 128px; min-width: 128px; height: 96px; border-radius: 10px; }
+        .skel-body { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+        .skel-title { height: 22px; width: 65%; }
+        .skel-text { height: 16px; width: 100%; }
+        .skel-text-sm { height: 16px; width: 50%; }
+        .skel-meta { height: 14px; width: 35%; margin-top: auto; }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 5rem 2rem;
+            color: var(--text-3);
+        }
+        .empty-state .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+        .empty-state h3 { font-size: 1.25rem; color: var(--text-2); margin-bottom: 0.375rem; }
+        .empty-state p { font-size: 0.9rem; }
+
+        /* ── Post View ── */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.875rem;
+            color: var(--text-2);
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-family: inherit;
+            padding: 0;
+            margin-bottom: 1.75rem;
+            transition: color 0.15s;
+        }
+        .back-btn:hover { color: var(--primary); }
+        .post-view-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            line-height: 1.3;
+            margin-bottom: 0.625rem;
+        }
+        .post-view-meta {
+            font-size: 0.875rem;
+            color: var(--text-3);
+            padding-bottom: 1.75rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        /* ── Markdown content ── */
+        .md-content { line-height: 1.8; font-size: 1rem; color: var(--text-1); }
+        .md-content h1, .md-content h2, .md-content h3,
+        .md-content h4, .md-content h5, .md-content h6 {
+            font-weight: 700; margin: 1.75em 0 0.6em; line-height: 1.3;
+        }
+        .md-content h1 { font-size: 1.75rem; }
+        .md-content h2 { font-size: 1.375rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4em; }
+        .md-content h3 { font-size: 1.125rem; }
+        .md-content p { margin-bottom: 1em; }
+        .md-content ul, .md-content ol { margin: 0.75em 0 0.75em 1.5em; }
+        .md-content li { margin-bottom: 0.3em; }
+        .md-content blockquote {
+            border-left: 4px solid var(--primary);
+            background: var(--primary-light);
+            padding: 0.75em 1.1em;
+            margin: 1em 0;
+            border-radius: 0 8px 8px 0;
+            color: var(--text-2);
+        }
+        .md-content code {
+            background: #f1f5f9;
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            font-size: 0.875em;
+            font-family: 'Fira Code', 'Cascadia Code', monospace;
+        }
+        .md-content pre {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 1.25em;
+            overflow-x: auto;
+            margin: 1.25em 0;
+        }
+        .md-content pre code { background: none; padding: 0; color: #e2e8f0; font-size: 0.875rem; }
+        .md-content img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
+        .md-content a { color: var(--primary); text-decoration: none; }
+        .md-content a:hover { text-decoration: underline; }
+        .md-content table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+        .md-content th, .md-content td { padding: 0.6em 0.85em; border: 1px solid var(--border); }
+        .md-content th { background: var(--bg); font-weight: 600; }
+        .md-content hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+
+        /* ── Write View ── */
+        .write-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .write-top-title { font-size: 1.1rem; font-weight: 600; }
+
+        .write-title-input {
+            width: 100%;
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: inherit;
+            border: none;
+            border-bottom: 2px solid var(--border);
+            padding: 0.5rem 0;
+            outline: none;
+            background: transparent;
+            color: var(--text-1);
+            margin-bottom: 0.75rem;
+            transition: border-color 0.2s;
+        }
+        .write-title-input::placeholder { color: var(--text-3); }
+        .write-title-input:focus { border-color: var(--primary); }
+
+        .write-image-input {
+            width: 100%;
+            font-size: 0.875rem;
+            font-family: inherit;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 0.875rem;
+            outline: none;
+            background: transparent;
+            color: var(--text-1);
+            margin-bottom: 1rem;
+            transition: border-color 0.2s;
+        }
+        .write-image-input::placeholder { color: var(--text-3); }
+        .write-image-input:focus { border-color: var(--primary); }
+
+        /* Toolbar */
+        .editor-toolbar {
+            display: flex;
+            gap: 0.125rem;
+            padding: 0.4rem 0.5rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px 8px 0 0;
+            flex-wrap: wrap;
+        }
+        .toolbar-btn {
+            padding: 0.3rem 0.55rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 0.8125rem;
+            color: var(--text-2);
+            font-family: 'Inter', sans-serif;
+            transition: all 0.1s;
+            line-height: 1;
+        }
+        .toolbar-btn:hover { background: var(--surface); color: var(--text-1); box-shadow: var(--shadow); }
+        .toolbar-sep { width: 1px; background: var(--border); margin: 0.25rem 0.2rem; align-self: stretch; }
+
+        /* Editor split */
+        .editor-wrap {
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 500px;
+        }
+        .editor-pane { display: flex; flex-direction: column; }
+        .editor-pane-label {
+            padding: 0.4rem 0.875rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+        }
+        .editor-textarea {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.75;
+            color: var(--text-1);
+            background: var(--surface);
+        }
+        .editor-preview-pane {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            border-left: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .editor-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.55);
+            backdrop-filter: blur(4px);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 490px;
+            margin: 1rem;
+            animation: modal-in 0.2s ease;
+        }
+        @keyframes modal-in {
+            from { opacity: 0; transform: scale(0.95) translateY(-12px); }
+            to   { opacity: 1; transform: none; }
+        }
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-title { font-size: 1rem; font-weight: 600; }
+        .modal-close {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-3); font-size: 1.25rem; padding: 0.2rem 0.4rem;
+            border-radius: 4px; transition: background 0.1s;
+        }
+        .modal-close:hover { background: var(--bg); color: var(--text-2); }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+        .form-group { margin-bottom: 1.1rem; }
+        .form-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.375rem; }
+        .form-hint { font-size: 0.8rem; color: var(--text-3); margin-top: 0.3rem; line-height: 1.5; }
+        .form-hint a { color: var(--primary); }
+        .form-input {
+            width: 100%;
+            padding: 0.6rem 0.875rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            outline: none;
+            background: var(--surface);
+            color: var(--text-1);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+        }
+
+        /* ── Banner ── */
+        .banner {
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .banner-warning { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+        .banner a { color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+        /* ── Toast ── */
+        .toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 0.7rem 1.1rem;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            animation: toast-slide 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            max-width: 340px;
+            pointer-events: auto;
+        }
+        @keyframes toast-slide {
+            from { opacity: 0; transform: translateX(110%); }
+            to   { opacity: 1; transform: none; }
+        }
+        .toast-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .toast-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .toast-info    { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .editor-wrap { grid-template-columns: 1fr; height: auto; }
+            .editor-textarea { height: 320px; }
+            .editor-preview-pane { display: none; }
+            .post-thumbnail { width: 96px; min-width: 96px; height: 72px; }
+            .post-view-title { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header class="header" id="header">
+    <div class="header-inner container">
+        <a class="logo" id="logo-btn" href="#" aria-label="게시판 홈">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            Jaehee's&nbsp;<span>Board</span>
+        </a>
+        <div class="header-actions">
+            <button class="btn btn-ghost btn-sm" id="settings-btn" title="설정">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                설정
+            </button>
+            <button class="btn btn-primary btn-sm" id="write-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                글쓰기
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main class="container main-content">
+
+    <!-- ── 게시판 목록 ── -->
+    <section id="view-board" class="view active">
+        <div class="board-header">
+            <h1 class="board-title">전체 글</h1>
+            <span class="post-count" id="post-count"></span>
+        </div>
+
+        <div id="no-pat-banner" class="banner banner-warning" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>GitHub PAT가 설정되지 않아 <strong>글쓰기 기능</strong>을 사용할 수 없습니다.</span>
+            <a id="banner-settings-link">지금 설정하기 →</a>
+        </div>
+
+        <ul class="post-list" id="post-list">
+            <!-- 스켈레톤 로딩 -->
+            <li class="skel-item">
+                <div class="skeleton skel-thumb"></div>
+                <div class="skel-body">
+                    <div class="skeleton skel-title"></div>
+                    <div class="skeleton skel-text"></div>
+                    <div class="skeleton skel-text-sm"></div>
+                    <div class="skeleton skel-meta"></div>
+                </div>
+            </li>
+            <li class="skel-item">
+                <div class="skeleton skel-thumb"></div>
+                <div class="skel-body">
+                    <div class="skeleton skel-title"></div>
+                    <div class="skeleton skel-text"></div>
+                    <div class="skeleton skel-text-sm"></div>
+                    <div class="skeleton skel-meta"></div>
+                </div>
+            </li>
+            <li class="skel-item">
+                <div class="skeleton skel-thumb"></div>
+                <div class="skel-body">
+                    <div class="skeleton skel-title"></div>
+                    <div class="skeleton skel-text"></div>
+                    <div class="skeleton skel-text-sm"></div>
+                    <div class="skeleton skel-meta"></div>
+                </div>
+            </li>
+        </ul>
+    </section>
+
+    <!-- ── 게시글 보기 ── -->
+    <section id="view-post" class="view">
+        <button class="back-btn" id="back-btn" aria-label="목록으로 돌아가기">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            목록으로 돌아가기
+        </button>
+        <article>
+            <h1 class="post-view-title" id="post-view-title"></h1>
+            <div class="post-view-meta" id="post-view-meta"></div>
+            <div class="md-content" id="post-view-content"></div>
+        </article>
+    </section>
+
+    <!-- ── 글쓰기 ── -->
+    <section id="view-write" class="view">
+        <div class="write-top">
+            <button class="back-btn" id="write-back-btn" style="margin-bottom:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+                취소
+            </button>
+            <span class="write-top-title">새 글 작성</span>
+            <div style="width:72px;"></div>
+        </div>
+
+        <input type="text"
+               class="write-title-input"
+               id="write-title"
+               placeholder="제목을 입력하세요"
+               autocomplete="off">
+
+        <input type="text"
+               class="write-image-input"
+               id="write-image"
+               placeholder="🖼️ 대표 이미지 URL (선택 사항, 목록에서 썸네일로 표시됩니다)"
+               autocomplete="off">
+
+        <div class="editor-toolbar" id="editor-toolbar">
+            <button class="toolbar-btn" data-action="bold"      title="굵게 (Ctrl+B)"><strong>B</strong></button>
+            <button class="toolbar-btn" data-action="italic"    title="기울임 (Ctrl+I)"><em>I</em></button>
+            <button class="toolbar-btn" data-action="strike"    title="취소선"><s>S</s></button>
+            <div class="toolbar-sep"></div>
+            <button class="toolbar-btn" data-action="h1">H1</button>
+            <button class="toolbar-btn" data-action="h2">H2</button>
+            <button class="toolbar-btn" data-action="h3">H3</button>
+            <div class="toolbar-sep"></div>
+            <button class="toolbar-btn" data-action="ul"        title="글머리 기호">• 목록</button>
+            <button class="toolbar-btn" data-action="ol"        title="번호 목록">1. 목록</button>
+            <button class="toolbar-btn" data-action="quote"     title="인용문">❝ 인용</button>
+            <div class="toolbar-sep"></div>
+            <button class="toolbar-btn" data-action="code"      title="인라인 코드">&lt;/&gt;</button>
+            <button class="toolbar-btn" data-action="codeblock" title="코드 블록">📄 코드블록</button>
+            <div class="toolbar-sep"></div>
+            <button class="toolbar-btn" data-action="link"      title="링크">🔗 링크</button>
+            <button class="toolbar-btn" data-action="image"     title="이미지 삽입">🖼️ 이미지</button>
+            <button class="toolbar-btn" data-action="hr"        title="구분선">— 구분선</button>
+        </div>
+
+        <div class="editor-wrap">
+            <div class="editor-pane">
+                <div class="editor-pane-label">✏️ 마크다운</div>
+                <textarea
+                    class="editor-textarea"
+                    id="editor-textarea"
+                    placeholder="마크다운으로 내용을 작성하세요...
+
+# 예시 제목
+
+본문 내용을 작성합니다.
+
+## 소제목
+
+- 항목 1
+- 항목 2
+
+**굵게**, *기울임*, ~~취소선~~
+
+> 인용구는 이렇게
+
+&#96;&#96;&#96;javascript
+// 코드 블록
+console.log('Hello, World!');
+&#96;&#96;&#96;
+"></textarea>
+            </div>
+            <div class="editor-pane">
+                <div class="editor-pane-label">👁️ 미리보기</div>
+                <div class="editor-preview-pane md-content" id="editor-preview"></div>
+            </div>
+        </div>
+
+        <div class="editor-actions">
+            <button class="btn btn-ghost" id="write-cancel-btn">취소</button>
+            <button class="btn btn-primary" id="publish-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                GitHub에 게시하기
+            </button>
+        </div>
+    </section>
+
+</main>
+
+<!-- ══════════════ SETTINGS MODAL ══════════════ -->
+<div class="modal-overlay" id="modal-settings" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-title">⚙️ 설정</span>
+            <button class="modal-close" id="modal-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label" for="pat-input">GitHub Personal Access Token (PAT)</label>
+                <input type="password" class="form-input" id="pat-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                <p class="form-hint">
+                    글쓰기(업로드) 기능에 필요합니다. 이 브라우저의 localStorage에만 저장됩니다.<br>
+                    <a href="https://github.com/settings/tokens/new?scopes=repo&description=Board+Writer" target="_blank" rel="noopener">
+                        → GitHub에서 PAT 발급하기 (repo 권한 선택)
+                    </a>
+                </p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="owner-input">레포지토리 소유자</label>
+                <input type="text" class="form-input" id="owner-input" placeholder="jaeheehur" value="jaeheehur" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="repo-input">레포지토리 이름</label>
+                <input type="text" class="form-input" id="repo-input" placeholder="board" value="board" autocomplete="off">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="branch-input">브랜치</label>
+                <input type="text" class="form-input" id="branch-input" placeholder="main" value="main" autocomplete="off">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="modal-cancel">취소</button>
+            <button class="btn btn-primary" id="modal-save">저장</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ TOAST ══════════════ -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<!-- ══════════════ SCRIPT ══════════════ -->
+<script>
+'use strict';
+
+// ────────────────────────────────────────────
+// CONFIG
+// ────────────────────────────────────────────
+const DEFAULT = { owner: 'jaeheehur', repo: 'board', branch: 'main' };
+
+function getCfg() {
+    return {
+        owner:  localStorage.getItem('board_owner')  || DEFAULT.owner,
+        repo:   localStorage.getItem('board_repo')   || DEFAULT.repo,
+        branch: localStorage.getItem('board_branch') || DEFAULT.branch,
+        pat:    localStorage.getItem('board_pat')    || '',
+    };
+}
+function saveCfg(c) {
+    if (c.owner  !== undefined) localStorage.setItem('board_owner',  c.owner);
+    if (c.repo   !== undefined) localStorage.setItem('board_repo',   c.repo);
+    if (c.branch !== undefined) localStorage.setItem('board_branch', c.branch);
+    if (c.pat    !== undefined) localStorage.setItem('board_pat',    c.pat);
+}
+
+// ────────────────────────────────────────────
+// GITHUB API
+// ────────────────────────────────────────────
+async function ghApi(path, method = 'GET', body = null) {
+    const { pat } = getCfg();
+    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    if (pat) headers['Authorization'] = `token ${pat}`;
+    if (body) headers['Content-Type'] = 'application/json';
+
+    const res = await fetch('https://api.github.com' + path, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : null,
+    });
+
+    if (res.status === 204) return null;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || `GitHub API 오류 (${res.status})`);
+    return data;
+}
+
+async function listPosts() {
+    const { owner, repo } = getCfg();
+    try {
+        const files = await ghApi(`/repos/${owner}/${repo}/contents/posts`);
+        if (!Array.isArray(files)) return [];
+        return files.filter(f => f.name.endsWith('.md') && f.name !== '.gitkeep');
+    } catch (e) {
+        if (e.message.includes('404') || e.message.includes('Not Found')) return [];
+        throw e;
+    }
+}
+
+async function getPost(path) {
+    const { owner, repo } = getCfg();
+    const data = await ghApi(`/repos/${owner}/${repo}/contents/${path}`);
+    // base64 decode (handle Unicode)
+    const raw = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+    return { content: raw, sha: data.sha };
+}
+
+async function createPost(filename, content) {
+    const { owner, repo, branch } = getCfg();
+    // encode UTF-8 → base64
+    const encoded = btoa(unescape(encodeURIComponent(content)));
+    return ghApi(`/repos/${owner}/${repo}/contents/posts/${filename}`, 'PUT', {
+        message: `docs: add post ${filename}`,
+        content: encoded,
+        branch,
+    });
+}
+
+// ────────────────────────────────────────────
+// FRONTMATTER
+// ────────────────────────────────────────────
+function parseFM(raw) {
+    const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+    if (!m) return { meta: {}, body: raw };
+    const meta = {};
+    m[1].split('\n').forEach(line => {
+        const idx = line.indexOf(':');
+        if (idx > 0) {
+            meta[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+        }
+    });
+    return { meta, body: m[2] };
+}
+
+function formatDate(str) {
+    if (!str) return '';
+    try {
+        const d = new Date(str);
+        return d.toLocaleString('ko-KR', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+        });
+    } catch { return str; }
+}
+
+function getPreview(body, max = 160) {
+    const text = body
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/`[^`]+`/g, '')
+        .replace(/!?\[[^\]]*\]\([^)]+\)/g, '')
+        .replace(/#{1,6} /g, '')
+        .replace(/[*_~>|]/g, '')
+        .replace(/\n+/g, ' ')
+        .trim();
+    return text.length > max ? text.slice(0, max) + '…' : text;
+}
+
+function escH(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ────────────────────────────────────────────
+// TOAST
+// ────────────────────────────────────────────
+function toast(msg, type = 'info', ms = 3500) {
+    const c = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+    el.textContent = `${icons[type] || ''} ${msg}`;
+    c.appendChild(el);
+    setTimeout(() => {
+        el.style.transition = 'opacity 0.35s';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 400);
+    }, ms);
+}
+
+// ────────────────────────────────────────────
+// VIEW ROUTER
+// ────────────────────────────────────────────
+let currentView = 'board';
+function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(`view-${name}`).classList.add('active');
+    currentView = name;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ────────────────────────────────────────────
+// BOARD
+// ────────────────────────────────────────────
+let cachedPosts = null;
+
+function renderSkeleton() {
+    return [1,2,3].map(() => `
+        <li class="skel-item">
+            <div class="skeleton skel-thumb"></div>
+            <div class="skel-body">
+                <div class="skeleton skel-title"></div>
+                <div class="skeleton skel-text"></div>
+                <div class="skeleton skel-text-sm"></div>
+                <div class="skeleton skel-meta"></div>
+            </div>
+        </li>`).join('');
+}
+
+async function loadBoard(force = false) {
+    showView('board');
+    updatePatBanner();
+
+    if (cachedPosts && !force) {
+        renderBoard(cachedPosts);
+        return;
+    }
+
+    document.getElementById('post-list').innerHTML = renderSkeleton();
+    document.getElementById('post-count').textContent = '';
+
+    try {
+        const files = await listPosts();
+        files.sort((a, b) => b.name.localeCompare(a.name));
+
+        const top = files.slice(0, 30);
+        const posts = await Promise.all(top.map(async f => {
+            try {
+                const { content } = await getPost(f.path);
+                const { meta, body } = parseFM(content);
+                return { filename: f.name, path: f.path, meta, body };
+            } catch { return null; }
+        }));
+
+        cachedPosts = posts.filter(Boolean);
+        renderBoard(cachedPosts);
+    } catch (e) {
+        document.getElementById('post-list').innerHTML = `
+            <div class="empty-state">
+                <div class="icon">⚠️</div>
+                <h3>불러오기 실패</h3>
+                <p>${escH(e.message)}</p>
+            </div>`;
+    }
+}
+
+function renderBoard(posts) {
+    const list = document.getElementById('post-list');
+    const cntEl = document.getElementById('post-count');
+
+    if (!posts.length) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">📭</div>
+                <h3>아직 게시글이 없습니다</h3>
+                <p>글쓰기 버튼을 눌러 첫 번째 글을 작성해 보세요!</p>
+            </div>`;
+        cntEl.textContent = '';
+        return;
+    }
+
+    cntEl.textContent = `총 ${posts.length}개`;
+    list.innerHTML = posts.map((post, i) => {
+        const title   = post.meta.title || post.filename.replace(/\.md$/, '');
+        const date    = formatDate(post.meta.date);
+        const preview = getPreview(post.body);
+        const img     = post.meta.image || '';
+
+        return `
+        <li class="post-item"
+            id="pi-${i}"
+            data-path="${escH(post.path)}"
+            role="button"
+            tabindex="0"
+            aria-label="${escH(title)}">
+            ${img ? `<div class="post-thumbnail">
+                <img src="${escH(img)}" alt="${escH(title)}"
+                     onerror="this.closest('.post-thumbnail').classList.add('no-img')">
+            </div>` : ''}
+            <div class="post-body">
+                <div>
+                    <p class="post-title">${escH(title)}</p>
+                    <p class="post-preview">${escH(preview)}</p>
+                </div>
+                <div class="post-meta">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    ${escH(date)}
+                </div>
+            </div>
+        </li>`;
+    }).join('');
+
+    list.querySelectorAll('.post-item').forEach(el => {
+        const open = () => loadPost(el.dataset.path);
+        el.addEventListener('click', open);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }});
+    });
+}
+
+// ────────────────────────────────────────────
+// POST VIEW
+// ────────────────────────────────────────────
+async function loadPost(path) {
+    showView('post');
+    const titleEl   = document.getElementById('post-view-title');
+    const metaEl    = document.getElementById('post-view-meta');
+    const contentEl = document.getElementById('post-view-content');
+
+    titleEl.textContent = '불러오는 중…';
+    metaEl.textContent  = '';
+    contentEl.innerHTML = `<div class="skeleton" style="height:380px;border-radius:8px;"></div>`;
+
+    try {
+        const { content } = await getPost(path);
+        const { meta, body } = parseFM(content);
+        const title = meta.title || path.split('/').pop().replace(/\.md$/, '');
+        const date  = formatDate(meta.date);
+
+        titleEl.textContent = title;
+        metaEl.innerHTML    = date
+            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${escH(date)}`
+            : '';
+        contentEl.innerHTML = marked.parse(body);
+        contentEl.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    } catch (e) {
+        contentEl.innerHTML = `<div class="empty-state">
+            <div class="icon">⚠️</div><h3>불러오기 실패</h3><p>${escH(e.message)}</p>
+        </div>`;
+    }
+}
+
+// ────────────────────────────────────────────
+// WRITE VIEW
+// ────────────────────────────────────────────
+function showWrite() {
+    const { pat } = getCfg();
+    if (!pat) {
+        toast('글쓰기를 위해 먼저 PAT를 설정해 주세요.', 'error');
+        openSettings();
+        return;
+    }
+    document.getElementById('write-title').value    = '';
+    document.getElementById('write-image').value    = '';
+    document.getElementById('editor-textarea').value = '';
+    document.getElementById('editor-preview').innerHTML = '';
+    document.getElementById('publish-btn').disabled  = false;
+    document.getElementById('publish-btn').innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+        GitHub에 게시하기`;
+    showView('write');
+}
+
+function makeFilename(title) {
+    const now = new Date();
+    const p = n => String(n).padStart(2,'0');
+    const date = `${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`;
+    const slug = title
+        .replace(/[\s]+/g, '-')
+        .replace(/[^\w가-힣-]/g, '')
+        .slice(0, 40) || 'post';
+    return `${date}-${now.getTime()}-${slug}.md`;
+}
+
+async function publishPost() {
+    const title = document.getElementById('write-title').value.trim();
+    const image = document.getElementById('write-image').value.trim();
+    const body  = document.getElementById('editor-textarea').value.trim();
+    const { pat } = getCfg();
+
+    if (!title) { toast('제목을 입력해 주세요.', 'error'); return; }
+    if (!body)  { toast('내용을 입력해 주세요.',  'error'); return; }
+    if (!pat)   { toast('PAT가 설정되지 않았습니다.', 'error'); openSettings(); return; }
+
+    const btn = document.getElementById('publish-btn');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ 업로드 중…';
+
+    const now = new Date().toISOString();
+    const fm = ['---', `title: ${title}`, `date: ${now}`, image ? `image: ${image}` : null, '---']
+        .filter(Boolean).join('\n');
+    const fullContent = `${fm}\n\n${body}`;
+    const filename = makeFilename(title);
+
+    try {
+        await createPost(filename, fullContent);
+        toast('게시글이 GitHub에 업로드되었습니다! 🎉', 'success', 5000);
+        cachedPosts = null;
+        setTimeout(() => loadBoard(true), 600);
+    } catch (e) {
+        toast(`업로드 실패: ${e.message}`, 'error', 6000);
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+            GitHub에 게시하기`;
+    }
+}
+
+// ────────────────────────────────────────────
+// EDITOR TOOLBAR
+// ────────────────────────────────────────────
+function setupToolbar() {
+    const ta = document.getElementById('editor-textarea');
+
+    document.querySelectorAll('.toolbar-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            const s = ta.selectionStart, e = ta.selectionEnd;
+            const sel = ta.value.slice(s, e);
+            let pre = '', post = '';
+
+            switch (action) {
+                case 'bold':      pre = '**'; post = '**'; break;
+                case 'italic':    pre = '*';  post = '*';  break;
+                case 'strike':    pre = '~~'; post = '~~'; break;
+                case 'h1':        pre = '\n# ';  break;
+                case 'h2':        pre = '\n## '; break;
+                case 'h3':        pre = '\n### ';break;
+                case 'ul':        pre = '\n- ';  break;
+                case 'ol':        pre = '\n1. '; break;
+                case 'quote':     pre = '\n> ';  break;
+                case 'code':      pre = '`';  post = '`';  break;
+                case 'codeblock': pre = '\n```\n'; post = '\n```\n'; break;
+                case 'link':      pre = '[';  post = '](https://)'; break;
+                case 'image':     pre = '!['; post = '](https://)'; break;
+                case 'hr':        pre = '\n---\n'; break;
+            }
+
+            const newVal = ta.value.slice(0, s) + pre + sel + post + ta.value.slice(e);
+            ta.value = newVal;
+            ta.focus();
+            const cursor = s + pre.length;
+            ta.setSelectionRange(cursor, cursor + sel.length);
+            updatePreview();
+        });
+    });
+
+    // Ctrl+B, Ctrl+I shortcuts
+    ta.addEventListener('keydown', e => {
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === 'b') { e.preventDefault(); document.querySelector('[data-action="bold"]').click(); }
+            if (e.key === 'i') { e.preventDefault(); document.querySelector('[data-action="italic"]').click(); }
+        }
+    });
+}
+
+function updatePreview() {
+    const val = document.getElementById('editor-textarea').value;
+    const pre = document.getElementById('editor-preview');
+    pre.innerHTML = marked.parse(val);
+    pre.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+}
+
+// ────────────────────────────────────────────
+// SETTINGS MODAL
+// ────────────────────────────────────────────
+function openSettings() {
+    const cfg = getCfg();
+    document.getElementById('pat-input').value    = cfg.pat;
+    document.getElementById('owner-input').value  = cfg.owner;
+    document.getElementById('repo-input').value   = cfg.repo;
+    document.getElementById('branch-input').value = cfg.branch;
+    document.getElementById('modal-settings').classList.add('active');
+}
+function closeSettings() {
+    document.getElementById('modal-settings').classList.remove('active');
+}
+function saveSettings() {
+    saveCfg({
+        pat:    document.getElementById('pat-input').value.trim(),
+        owner:  document.getElementById('owner-input').value.trim() || DEFAULT.owner,
+        repo:   document.getElementById('repo-input').value.trim()  || DEFAULT.repo,
+        branch: document.getElementById('branch-input').value.trim() || DEFAULT.branch,
+    });
+    closeSettings();
+    updatePatBanner();
+    cachedPosts = null;
+    if (currentView === 'board') loadBoard(true);
+    toast('설정이 저장되었습니다.', 'success');
+}
+
+function updatePatBanner() {
+    const banner = document.getElementById('no-pat-banner');
+    banner.style.display = getCfg().pat ? 'none' : 'flex';
+}
+
+// ────────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+
+    // Marked config
+    marked.use({ gfm: true, breaks: true });
+
+    // Header scroll effect
+    window.addEventListener('scroll', () => {
+        document.getElementById('header').classList.toggle('scrolled', window.scrollY > 10);
+    }, { passive: true });
+
+    // Navigation
+    document.getElementById('logo-btn').addEventListener('click', e => { e.preventDefault(); loadBoard(); });
+    document.getElementById('write-btn').addEventListener('click', showWrite);
+    document.getElementById('back-btn').addEventListener('click', () => loadBoard());
+    document.getElementById('write-back-btn').addEventListener('click', () => loadBoard());
+    document.getElementById('write-cancel-btn').addEventListener('click', () => loadBoard());
+
+    // Settings
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+    document.getElementById('modal-close').addEventListener('click', closeSettings);
+    document.getElementById('modal-cancel').addEventListener('click', closeSettings);
+    document.getElementById('modal-save').addEventListener('click', saveSettings);
+    document.getElementById('banner-settings-link').addEventListener('click', openSettings);
+    document.getElementById('modal-settings').addEventListener('click', e => {
+        if (e.target.id === 'modal-settings') closeSettings();
+    });
+    // Close modal on Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('modal-settings').classList.contains('active')) {
+            closeSettings();
+        }
+    });
+
+    // Publish
+    document.getElementById('publish-btn').addEventListener('click', publishPost);
+
+    // Live preview
+    document.getElementById('editor-textarea').addEventListener('input', updatePreview);
+
+    // Toolbar
+    setupToolbar();
+
+    // Kick off
+    updatePatBanner();
+    loadBoard();
+});
+</script>
+</body>
+</html>
