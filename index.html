@@ -532,6 +532,33 @@
         .toast-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
         .toast-info    { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
 
+        /* ── Post action buttons ── */
+        .post-actions {
+            display: flex;
+            gap: 0.625rem;
+            margin-top: 2.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .btn-edit {
+            background: #f0f9ff;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+        }
+        .btn-edit:hover { background: #e0f2fe; }
+        .btn-delete {
+            background: #fff1f2;
+            color: #be123c;
+            border: 1px solid #fda4af;
+        }
+        .btn-delete:hover { background: #ffe4e6; }
+
+        /* ── Delete confirm modal ── */
+        .modal-danger .modal-header { border-bottom-color: #fee2e2; }
+        .modal-danger .modal-title  { color: #dc2626; }
+        .btn-confirm-delete { background: #dc2626; color: #fff; border: none; }
+        .btn-confirm-delete:hover { background: #b91c1c; }
+
         /* ── Responsive ── */
         @media (max-width: 640px) {
             .editor-wrap { grid-template-columns: 1fr; height: auto; }
@@ -639,6 +666,25 @@
             <h1 class="post-view-title" id="post-view-title"></h1>
             <div class="post-view-meta" id="post-view-meta"></div>
             <div class="md-content" id="post-view-content"></div>
+            <!-- 수정/삭제 버튼 (PAT 있을 때만 표시) -->
+            <div class="post-actions" id="post-actions" style="display:none;">
+                <button class="btn btn-edit btn-sm" id="edit-post-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    수정하기
+                </button>
+                <button class="btn btn-delete btn-sm" id="delete-post-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                        <path d="M10 11v6"/><path d="M14 11v6"/>
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                    삭제하기
+                </button>
+            </div>
         </article>
     </section>
 
@@ -773,6 +819,34 @@ console.log('Hello, World!');
     </div>
 </div>
 
+<!-- ══════════════ DELETE CONFIRM MODAL ══════════════ -->
+<div class="modal-overlay" id="modal-delete" role="dialog" aria-modal="true">
+    <div class="modal modal-danger">
+        <div class="modal-header">
+            <span class="modal-title">🗑️ 게시글 삭제</span>
+            <button class="modal-close" id="delete-modal-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:0.9375rem; color:var(--text-2); line-height:1.6;">
+                이 게시글을 삭제하면 GitHub에서 파일이 영구적으로 제거됩니다.<br>
+                <strong style="color:var(--text-1);">정말 삭제하시겠습니까?</strong>
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="delete-modal-cancel">취소</button>
+            <button class="btn btn-confirm-delete" id="delete-modal-confirm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6"/><path d="M14 11v6"/>
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+                삭제하기
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- ══════════════ TOAST ══════════════ -->
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
@@ -843,11 +917,30 @@ async function getPost(path) {
 
 async function createPost(filename, content) {
     const { owner, repo, branch } = getCfg();
-    // encode UTF-8 → base64
     const encoded = btoa(unescape(encodeURIComponent(content)));
     return ghApi(`/repos/${owner}/${repo}/contents/posts/${filename}`, 'PUT', {
         message: `docs: add post ${filename}`,
         content: encoded,
+        branch,
+    });
+}
+
+async function updatePost(path, sha, filename, content) {
+    const { owner, repo, branch } = getCfg();
+    const encoded = btoa(unescape(encodeURIComponent(content)));
+    return ghApi(`/repos/${owner}/${repo}/contents/${path}`, 'PUT', {
+        message: `docs: update post ${filename}`,
+        content: encoded,
+        sha,
+        branch,
+    });
+}
+
+async function deletePost(path, sha, filename) {
+    const { owner, repo, branch } = getCfg();
+    return ghApi(`/repos/${owner}/${repo}/contents/${path}`, 'DELETE', {
+        message: `docs: delete post ${filename}`,
+        sha,
         branch,
     });
 }
@@ -911,6 +1004,11 @@ function toast(msg, type = 'info', ms = 3500) {
         setTimeout(() => el.remove(), 400);
     }, ms);
 }
+
+// ────────────────────────────────────────────
+// EDIT MODE STATE
+// ────────────────────────────────────────────
+let editMode = { active: false, path: null, sha: null, filename: null, originalDate: null };
 
 // ────────────────────────────────────────────
 // VIEW ROUTER
@@ -1039,21 +1137,29 @@ function renderBoard(posts) {
 // ────────────────────────────────────────────
 // POST VIEW
 // ────────────────────────────────────────────
+let currentPostData = null; // { path, sha, meta, body, filename }
+
 async function loadPost(path) {
     showView('post');
     const titleEl   = document.getElementById('post-view-title');
     const metaEl    = document.getElementById('post-view-meta');
     const contentEl = document.getElementById('post-view-content');
+    const actionsEl = document.getElementById('post-actions');
 
     titleEl.textContent = '불러오는 중…';
     metaEl.textContent  = '';
     contentEl.innerHTML = `<div class="skeleton" style="height:380px;border-radius:8px;"></div>`;
+    actionsEl.style.display = 'none';
+    currentPostData = null;
 
     try {
-        const { content } = await getPost(path);
+        const { content, sha } = await getPost(path);
         const { meta, body } = parseFM(content);
-        const title = meta.title || path.split('/').pop().replace(/\.md$/, '');
-        const date  = formatDate(meta.date);
+        const filename = path.split('/').pop();
+        const title    = meta.title || filename.replace(/\.md$/, '');
+        const date     = formatDate(meta.date);
+
+        currentPostData = { path, sha, meta, body, filename };
 
         titleEl.textContent = title;
         metaEl.innerHTML    = date
@@ -1061,6 +1167,9 @@ async function loadPost(path) {
             : '';
         contentEl.innerHTML = marked.parse(body);
         contentEl.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+
+        // PAT 있을 때만 수정/삭제 버튼 표시
+        if (getCfg().pat) actionsEl.style.display = 'flex';
     } catch (e) {
         contentEl.innerHTML = `<div class="empty-state">
             <div class="icon">⚠️</div><h3>불러오기 실패</h3><p>${escH(e.message)}</p>
@@ -1071,24 +1180,54 @@ async function loadPost(path) {
 // ────────────────────────────────────────────
 // WRITE VIEW
 // ────────────────────────────────────────────
-function showWrite() {
+function showWrite(mode = 'create') {
     const { pat } = getCfg();
     if (!pat) {
         toast('글쓰기를 위해 먼저 PAT를 설정해 주세요.', 'error');
         openSettings();
         return;
     }
-    document.getElementById('write-title').value    = '';
-    document.getElementById('write-image').value    = '';
-    document.getElementById('editor-textarea').value = '';
-    document.getElementById('editor-preview').innerHTML = '';
-    document.getElementById('publish-btn').disabled  = false;
-    document.getElementById('publish-btn').innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-        </svg>
-        GitHub에 게시하기`;
+
+    const titleSpan = document.querySelector('.write-top-title');
+
+    if (mode === 'edit' && currentPostData) {
+        // 수정 모드: 기존 내용 로드
+        editMode = {
+            active: true,
+            path: currentPostData.path,
+            sha: currentPostData.sha,
+            filename: currentPostData.filename,
+            originalDate: currentPostData.meta.date || '',
+        };
+        document.getElementById('write-title').value     = currentPostData.meta.title || '';
+        document.getElementById('write-image').value     = currentPostData.meta.image || '';
+        document.getElementById('editor-textarea').value = currentPostData.body;
+        titleSpan.textContent = '글 수정';
+        document.getElementById('publish-btn').innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            수정 저장하기`;
+    } else {
+        // 신규 작성 모드
+        editMode = { active: false, path: null, sha: null, filename: null, originalDate: null };
+        document.getElementById('write-title').value     = '';
+        document.getElementById('write-image').value     = '';
+        document.getElementById('editor-textarea').value = '';
+        titleSpan.textContent = '새 글 작성';
+        document.getElementById('publish-btn').innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+            GitHub에 게시하기`;
+    }
+
+    updatePreview();
+    document.getElementById('editor-preview').innerHTML = marked.parse(document.getElementById('editor-textarea').value);
+    document.getElementById('publish-btn').disabled = false;
     showView('write');
 }
 
@@ -1115,28 +1254,62 @@ async function publishPost() {
 
     const btn = document.getElementById('publish-btn');
     btn.disabled = true;
-    btn.innerHTML = '⏳ 업로드 중…';
+    btn.innerHTML = '⏳ 처리 중…';
 
-    const now = new Date().toISOString();
-    const fm = ['---', `title: ${title}`, `date: ${now}`, image ? `image: ${image}` : null, '---']
+    // 날짜: 수정 모드면 원본 날짜 유지, 신규면 현재 시각
+    const dateVal = (editMode.active && editMode.originalDate) ? editMode.originalDate : new Date().toISOString();
+    const fm = ['---', `title: ${title}`, `date: ${dateVal}`, image ? `image: ${image}` : null, '---']
         .filter(Boolean).join('\n');
     const fullContent = `${fm}\n\n${body}`;
-    const filename = makeFilename(title);
 
     try {
-        await createPost(filename, fullContent);
-        toast('게시글이 GitHub에 업로드되었습니다! 🎉', 'success', 5000);
+        if (editMode.active) {
+            // 수정 모드
+            await updatePost(editMode.path, editMode.sha, editMode.filename, fullContent);
+            toast('게시글이 수정되었습니다! ✏️', 'success', 4000);
+        } else {
+            // 신규 작성
+            const filename = makeFilename(title);
+            await createPost(filename, fullContent);
+            toast('게시글이 GitHub에 업로드되었습니다! 🎉', 'success', 5000);
+        }
         cachedPosts = null;
+        editMode = { active: false, path: null, sha: null, filename: null, originalDate: null };
         setTimeout(() => loadBoard(true), 600);
     } catch (e) {
-        toast(`업로드 실패: ${e.message}`, 'error', 6000);
+        toast(`실패: ${e.message}`, 'error', 6000);
         btn.disabled = false;
-        btn.innerHTML = `
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-            GitHub에 게시하기`;
+        btn.innerHTML = editMode.active
+            ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 수정 저장하기`
+            : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> GitHub에 게시하기`;
+    }
+}
+
+// ────────────────────────────────────────────
+// DELETE
+// ────────────────────────────────────────────
+function openDeleteModal() {
+    document.getElementById('modal-delete').classList.add('active');
+}
+function closeDeleteModal() {
+    document.getElementById('modal-delete').classList.remove('active');
+}
+async function confirmDelete() {
+    if (!currentPostData) return;
+    const btn = document.getElementById('delete-modal-confirm');
+    btn.disabled = true;
+    btn.textContent = '⏳ 삭제 중…';
+    try {
+        await deletePost(currentPostData.path, currentPostData.sha, currentPostData.filename);
+        closeDeleteModal();
+        toast('게시글이 삭제되었습니다.', 'info', 4000);
+        cachedPosts = null;
+        currentPostData = null;
+        setTimeout(() => loadBoard(true), 600);
+    } catch (e) {
+        toast(`삭제 실패: ${e.message}`, 'error', 6000);
+        btn.disabled = false;
+        btn.textContent = '삭제하기';
     }
 }
 
@@ -1243,10 +1416,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Navigation
     document.getElementById('logo-btn').addEventListener('click', e => { e.preventDefault(); loadBoard(); });
-    document.getElementById('write-btn').addEventListener('click', showWrite);
+    document.getElementById('write-btn').addEventListener('click', () => showWrite('create'));
     document.getElementById('back-btn').addEventListener('click', () => loadBoard());
-    document.getElementById('write-back-btn').addEventListener('click', () => loadBoard());
-    document.getElementById('write-cancel-btn').addEventListener('click', () => loadBoard());
+    document.getElementById('write-back-btn').addEventListener('click', () => { editMode = { active: false }; loadBoard(); });
+    document.getElementById('write-cancel-btn').addEventListener('click', () => { editMode = { active: false }; loadBoard(); });
+
+    // Edit / Delete buttons
+    document.getElementById('edit-post-btn').addEventListener('click', () => showWrite('edit'));
+    document.getElementById('delete-post-btn').addEventListener('click', openDeleteModal);
+    document.getElementById('delete-modal-close').addEventListener('click', closeDeleteModal);
+    document.getElementById('delete-modal-cancel').addEventListener('click', closeDeleteModal);
+    document.getElementById('delete-modal-confirm').addEventListener('click', confirmDelete);
+    document.getElementById('modal-delete').addEventListener('click', e => {
+        if (e.target.id === 'modal-delete') closeDeleteModal();
+    });
 
     // Settings
     document.getElementById('settings-btn').addEventListener('click', openSettings);
@@ -1257,10 +1440,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modal-settings').addEventListener('click', e => {
         if (e.target.id === 'modal-settings') closeSettings();
     });
-    // Close modal on Escape
+    // Close modals on Escape
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && document.getElementById('modal-settings').classList.contains('active')) {
-            closeSettings();
+        if (e.key === 'Escape') {
+            if (document.getElementById('modal-settings').classList.contains('active')) closeSettings();
+            if (document.getElementById('modal-delete').classList.contains('active'))   closeDeleteModal();
         }
     });
 
