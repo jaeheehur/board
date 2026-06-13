@@ -376,11 +376,17 @@
             border-top: none;
             border-radius: 0 0 10px 10px;
             overflow: hidden;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            display: flex;
             height: 500px;
+            min-height: 280px;
         }
-        .editor-pane { display: flex; flex-direction: column; }
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
         .editor-pane-label {
             padding: 0.4rem 0.875rem;
             font-size: 0.75rem;
@@ -390,6 +396,10 @@
             letter-spacing: 0.06em;
             background: var(--bg);
             border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
         }
         .editor-textarea {
             flex: 1;
@@ -402,6 +412,7 @@
             line-height: 1.75;
             color: var(--text-1);
             background: var(--surface);
+            overflow-y: auto;
         }
         .editor-preview-pane {
             flex: 1;
@@ -410,6 +421,42 @@
             border-left: 1px solid var(--border);
             background: var(--surface);
         }
+
+        /* Drag resizer */
+        .editor-resizer {
+            width: 5px;
+            background: var(--border);
+            cursor: col-resize;
+            flex-shrink: 0;
+            transition: background 0.15s;
+            position: relative;
+        }
+        .editor-resizer::after {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0;
+            left: -5px; right: -5px;
+        }
+        .editor-resizer:hover,
+        .editor-resizer.dragging { background: var(--primary); }
+
+        /* Preview toggle button (inside label) */
+        .preview-toggle-btn {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--primary);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            line-height: 1.4;
+            transition: all 0.12s;
+        }
+        .preview-toggle-btn:hover { background: var(--primary-light); border-color: var(--primary); }
+        .preview-toggle-btn.off { color: var(--text-3); border-color: var(--border); background: var(--bg); }
+        .preview-toggle-btn.off:hover { background: var(--surface); color: var(--text-2); }
         .editor-actions {
             display: flex;
             justify-content: flex-end;
@@ -561,9 +608,10 @@
 
         /* ── Responsive ── */
         @media (max-width: 640px) {
-            .editor-wrap { grid-template-columns: 1fr; height: auto; }
+            .editor-wrap { flex-direction: column; height: auto; }
+            .editor-resizer { display: none; }
             .editor-textarea { height: 320px; }
-            .editor-preview-pane { display: none; }
+            #preview-pane { display: none !important; }
             .post-thumbnail { width: 96px; min-width: 96px; height: 72px; }
             .post-view-title { font-size: 1.5rem; }
         }
@@ -734,8 +782,8 @@
             <button class="toolbar-btn" data-action="hr"        title="구분선">— 구분선</button>
         </div>
 
-        <div class="editor-wrap">
-            <div class="editor-pane">
+        <div class="editor-wrap" id="editor-wrap">
+            <div class="editor-pane" id="editor-left-pane">
                 <div class="editor-pane-label">✏️ 마크다운</div>
                 <textarea
                     class="editor-textarea"
@@ -761,8 +809,14 @@ console.log('Hello, World!');
 &#96;&#96;&#96;
 "></textarea>
             </div>
-            <div class="editor-pane">
-                <div class="editor-pane-label">👁️ 미리보기</div>
+            <!-- 드래그 리사이저 -->
+            <div class="editor-resizer" id="editor-resizer"></div>
+            <!-- 미리보기 패널 -->
+            <div class="editor-pane" id="preview-pane">
+                <div class="editor-pane-label">
+                    <span>👁️ 미리보기</span>
+                    <button class="preview-toggle-btn" id="toggle-preview-btn" title="미리보기 켜기/끄기">끄기</button>
+                </div>
                 <div class="editor-preview-pane md-content" id="editor-preview"></div>
             </div>
         </div>
@@ -1402,6 +1456,69 @@ function updatePatBanner() {
 }
 
 // ────────────────────────────────────────────
+// EDITOR: PREVIEW TOGGLE & DRAG RESIZE
+// ────────────────────────────────────────────
+let previewVisible = true;
+
+function togglePreview() {
+    previewVisible = !previewVisible;
+    const previewPane = document.getElementById('preview-pane');
+    const resizer     = document.getElementById('editor-resizer');
+    const btn         = document.getElementById('toggle-preview-btn');
+    const leftPane    = document.getElementById('editor-left-pane');
+
+    if (previewVisible) {
+        previewPane.style.display = '';
+        resizer.style.display     = '';
+        leftPane.style.flex       = '';  // restore flex:1
+        btn.textContent           = '끄기';
+        btn.classList.remove('off');
+    } else {
+        previewPane.style.display = 'none';
+        resizer.style.display     = 'none';
+        leftPane.style.flex       = '1 1 100%';
+        btn.textContent           = '켜기';
+        btn.classList.add('off');
+    }
+}
+
+function setupResizer() {
+    const resizer  = document.getElementById('editor-resizer');
+    const wrap     = document.getElementById('editor-wrap');
+    const leftPane = document.getElementById('editor-left-pane');
+    let isDragging = false;
+    let startX     = 0;
+    let startW     = 0;
+
+    resizer.addEventListener('mousedown', e => {
+        if (!previewVisible) return;
+        isDragging = true;
+        startX     = e.clientX;
+        startW     = leftPane.getBoundingClientRect().width;
+        resizer.classList.add('dragging');
+        document.body.style.cursor     = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        const wrapW  = wrap.getBoundingClientRect().width;
+        const newW   = startW + (e.clientX - startX);
+        const pct    = Math.max(20, Math.min(80, (newW / wrapW) * 100));
+        leftPane.style.flex = `0 0 ${pct}%`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        resizer.classList.remove('dragging');
+        document.body.style.cursor     = '';
+        document.body.style.userSelect = '';
+    });
+}
+
+// ────────────────────────────────────────────
 // INIT
 // ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -1456,6 +1573,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Toolbar
     setupToolbar();
+
+    // Preview toggle & resizer
+    document.getElementById('toggle-preview-btn').addEventListener('click', togglePreview);
+    setupResizer();
 
     // Kick off
     updatePatBanner();
