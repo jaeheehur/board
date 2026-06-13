@@ -780,6 +780,7 @@
             <button class="toolbar-btn" data-action="link"      title="링크">🔗 링크</button>
             <button class="toolbar-btn" data-action="image"     title="이미지 삽입">🖼️ 이미지</button>
             <button class="toolbar-btn" data-action="hr"        title="구분선">— 구분선</button>
+            <button class="toolbar-btn" data-action="table"     title="테이블 삽입">&#9776; 테이블</button>
             <div style="flex:1"></div>
             <div class="toolbar-sep"></div>
             <button class="toolbar-btn preview-toggle-btn" id="toggle-preview-btn" title="미리보기 켜기/끄기">
@@ -1403,6 +1404,9 @@ function setupToolbar() {
                 case 'link':      pre = '[';  post = '](https://)'; break;
                 case 'image':     pre = '!['; post = '](https://)'; break;
                 case 'hr':        pre = '\n---\n'; break;
+                case 'table':
+                    pre = '\n| 제목1 | 제목1 | 제목2 |\n|--------|--------|--------|\n| 내용  | 내용  | 내용  |\n| 내용  | 내용  | 내용  |\n';
+                    break;
             }
 
             const newVal = ta.value.slice(0, s) + pre + sel + post + ta.value.slice(e);
